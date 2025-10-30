@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapa Interactivo con Firebase</title>
+    <script src='https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.js'></script>
+    <link href='https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.css' rel='stylesheet' />
+    <link href='./CSS/style.css' rel='stylesheet'/>
+
+    <script src='https://unpkg.com/@turf/turf@6/turf.min.js'></script>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+
+</head>
+<body>
+<!-- Menú Lateral -->
+<aside id="menu" class="menu">
+    <div class="titulo">
+        <h2>Mapa</h2>
+        <p>Ubicaciones en tiempo real</p>
+    </div>
+    <div class="opciones">
+        <div class="boton-opciones" onclick="showLocationsPanel()">
+            <div class="icono-opciones">📋</div>
+            <p>Ver ubicaciones guardadas</p>
+        </div>
+
+        <!-- Nuevo: Selector de usuarios (solo para admins) -->
+        <div class="boton-opciones" id="userSelectorBtn" style="display: none;" onclick="showUserSelector()">
+            <div class="icono-opciones">👥</div>
+            <p>Seleccionar Usuario</p>
+        </div>
+
+        <!-- Nuevo: Gestión de usuarios (solo para admins) -->
+        <div class="boton-opciones" id="userManagementBtn" style="display: none;" onclick="showUserManagement()">
+            <div class="icono-opciones">⚙️</div>
+            <p>Gestionar Usuarios</p>
+        </div>
+
+        <!-- Nuevo: Gestión de geocercas (solo para admins) -->
+        <div class="boton-opciones" id="geofenceManagementBtn" style="display: none;" onclick="showGeofenceManagement()">
+            <div class="icono-opciones">🗺️</div>
+            <p>Gestionar Geocercas</p>
+            <span id="geofenceAlertBadge" class="alert-badge" style="display: none;">0</span>
+        </div>
+
+        <!-- Nuevo: Alertas de geocercas (solo para admins) -->
+        <div class="boton-opciones" id="geofenceAlertsBtn" style="display: none;" onclick="showGeofenceAlerts()">
+            <div class="icono-opciones">🚨</div>
+            <p>Alertas de Geocercas</p>
+            <span id="alertsBadge" class="alert-badge" style="display: none;">0</span>
+        </div>
+    </div>
+    <div class="inicio-sesion">
+        <p id="userName">Iniciar Sesión</p>
+        <button class="iniciarsesion" onclick="toggleAuth()" id="authButton">Ingresar</button>
+    </div>
+</aside>
+
+<!-- Contenido Principal - Mapa -->
+<main class="map-content" id="mapContent">
+    <div class="map-container">
+        <div class="map-wrapper">
+            <!-- Mensaje cuando no hay sesión -->
+            <div id="noAuthMessage" class="no-auth-message">
+                <h3>Inicia Sesión</h3>
+                <p>Para visualizar el mapa y tus ubicaciones, inicia sesión o regístrate</p>
+                <div class="auth-buttons-message">
+                    <button class="login-btn-message" onclick="showAuthOverlay()">Iniciar Sesión</button>
+                    <button class="signup-btn-message" onclick="showAuthOverlay()">Registrarse</button>
+                </div>
+            </div>
+
+            <!-- Mapa (oculto inicialmente) -->
+            <div id="map"></div>
+
+            <!-- Botón flotante de ubicación actual -->
+            <button class="floating-location-btn" onclick="showCurrentLocation()" id="floatingLocationBtn" style="display: none;">
+                📍 Mi Ubicación
+            </button>
+
+            <!-- Botón para crear geocerca (solo para admins) -->
+            <button class="floating-location-btn" id="createGeofenceBtn" style="display: none; bottom: 80px; background: #ff6b6b;" onclick="startGeofenceCreation()">
+                🗺️ Crear Geocerca
+            </button>
+        </div>
+    </div>
+
+    <!-- Panel de ubicaciones (oculto inicialmente) -->
+    <div class="locations-panel" id="locationsPanel">
+        <button class="close-panel-btn" onclick="hideLocationsPanel()">×</button>
+        <h3>Mis Ubicaciones
+            <span class="real-time-indicator" id="realTimeIndicator" style="display: none;">
+                ● EN VIVO
+            </span>
+        </h3>
+        <div id="locations-list">
+            <div class="loading">Cargando ubicaciones...</div>
+        </div>
+    </div>
+
+    <!-- Panel de geocercas (nuevo) -->
+    <div class="locations-panel" id="geofencesPanel" style="display: none;">
+        <button class="close-panel-btn" onclick="hideGeofencesPanel()">×</button>
+        <h3>Gestión de Geocercas</h3>
+        <div id="geofences-list">
+            <div class="loading">Cargando geocercas...</div>
+        </div>
+    </div>
+
+    <!-- Panel de alertas (nuevo) -->
+    <div class="locations-panel" id="alertsPanel" style="display: none;">
+        <button class="close-panel-btn" onclick="hideAlertsPanel()">×</button>
+        <h3>Alertas de Geocercas</h3>
+        <div id="alerts-list">
+            <div class="loading">Cargando alertas...</div>
+        </div>
+    </div>
+</main>
+
+<!-- Overlay de Autenticación -->
+<div id="authOverlay" class="auth-overlay">
+    <div class="auth-container">
+        <h3>Iniciar Sesión</h3>
+        <div id="authError" class="error" style="display: none;"></div>
+        <div class="auth-form">
+            <input type="email" id="emailInput" placeholder="Correo electrónico">
+            <input type="password" id="passwordInput" placeholder="Contraseña">
+            <div class="auth-buttons">
+                <button class="login-btn" onclick="login()">Iniciar Sesión</button>
+                <button class="signup-btn" onclick="signup()">Registrarse</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="geofenceTypeModal" class="auth-overlay" style="display: none;">
+    <div class="auth-container">
+        <h3>Seleccionar Tipo de Geocerca</h3>
+        <div style="display: flex; gap: 15px; margin: 20px 0;">
+            <button class="geofence-type-btn" onclick="selectGeofenceType('circular')"
+                    style="flex: 1; padding: 20px; background: #96A78D; color: white; border: none; border-radius: 10px; cursor: pointer;">
+                <div style="font-size: 24px;">⭕</div>
+                <div>Circular</div>
+                <small>Centro + Radio</small>
+            </button>
+            <button class="geofence-type-btn" onclick="selectGeofenceType('poligonal')"
+                    style="flex: 1; padding: 20px; background: #ff6b6b; color: white; border: none; border-radius: 10px; cursor: pointer;">
+                <div style="font-size: 24px;">🔷</div>
+                <div>Poligonal</div>
+                <small>Múltiples puntos</small>
+            </button>
+        </div>
+        <button onclick="hideGeofenceTypeModal()"
+                style="width: 100%; padding: 10px; background: #ccc; color: #333; border: none; border-radius: 5px; cursor: pointer;">
+            Cancelar
+        </button>
+    </div>
+    </div>
+
+<script src="./JS/script.js"></script>
+
+
+</body>
+</html>
