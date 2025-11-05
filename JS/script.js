@@ -50,6 +50,12 @@ function initializeApp() {
     initializeMap();
     setupAuthListener();
     setupKeyboardControls();
+    addWebLocationButton();
+
+    // Solo para admins
+    if (currentUserRole === 'admin') {
+        addFixMobileUsersButton();
+    }
 }
 
 function initializeMap() {
@@ -195,7 +201,7 @@ function setupCurrentLocationListener() {
 
     let query;
     if (currentUserRole === 'admin' && usuarioSeleccionado) {
-        console.log('🎯 Monitoreando usuario específico:', usuarioSeleccionado.nombre);
+        console.log('Monitoreando usuario específico:', usuarioSeleccionado.nombre);
         query = db.collection("ubicaciones_actuales")
             .where("userId", "==", usuarioSeleccionado.id);
     } else if (currentUserRole === 'admin') {
@@ -216,14 +222,13 @@ function setupCurrentLocationListener() {
         if (!querySnapshot.empty) {
             querySnapshot.forEach((doc) => {
                 const locationData = doc.data();
-                console.log('📍 Ubicación recibida:', locationData);
+                console.log('Ubicación recibida:', locationData);
 
                 // Actualizar interfaz
                 updateCurrentLocationOnMap(locationData);
                 updateCurrentLocationInList(locationData);
                 showRealTimeIndicator();
 
-                // ✅ VERIFICAR GEOCERCAS - ESTA ES LA PARTE CLAVE
                 checkGeofencesForLocation(locationData);
             });
         } else {
@@ -266,7 +271,7 @@ function updateCurrentLocationOnMap(location) {
         .setPopup(new mapboxgl.Popup({ offset: 25 })
             .setHTML(`
                 <div class="geofence-popup">
-                    <h4>📍 Ubicación Actual</h4>
+                    <h4>Ubicación Actual</h4>
                     <p><strong>Usuario:</strong> ${usuarioSeleccionado ? usuarioSeleccionado.nombre : 'Tú'}</p>
                     <p><strong>Coordenadas:</strong> ${latitud.toFixed(6)}, ${longitud.toFixed(6)}</p>
                     <p><strong>Dirección:</strong> ${direccion || 'No disponible'}</p>
@@ -284,7 +289,7 @@ function updateCurrentLocationOnMap(location) {
         });
     }
 
-    console.log('📍 Marcador de ubicación actualizado en el mapa');
+    console.log('Marcador de ubicación actualizado en el mapa');
 }
 
 function updateCurrentLocationInList(location) {
@@ -298,7 +303,7 @@ function updateCurrentLocationInList(location) {
     const locationHTML = `
             <div class="location-item current-location-item" id="current-location-item">
                 <div class="location-header">
-                    <span class="location-number">📍</span>
+                    <span class="location-number"></span>
                     <span class="current-location-badge">EN VIVO</span>
                 </div>
                 <div class="location-address">
@@ -354,7 +359,7 @@ function removeCurrentLocationMarker() {
     if (currentUserLocationMarker) {
         currentUserLocationMarker.remove();
         currentUserLocationMarker = null;
-        console.log('📍 Marcador de ubicación removido');
+        console.log('Marcador de ubicación removido');
     }
 }
 
@@ -362,22 +367,22 @@ function removeCurrentLocationMarker() {
 function checkGeofencesForLocation(locationData) {
     const { latitud, longitud, userId } = locationData;
 
-    console.log(`🔍 Verificando geocercas para usuario: ${userId}`);
-    console.log(`📍 Ubicación: ${latitud}, ${longitud}`);
-    console.log(`📊 Total geocercas cargadas: ${geocercas.length}`);
+    console.log(`Verificando geocercas para usuario: ${userId}`);
+    console.log(`Ubicación: ${latitud}, ${longitud}`);
+    console.log(`Total geocercas cargadas: ${geocercas.length}`);
 
     // Filtrar geocercas activas para este usuario
     const userGeofences = geocercas.filter(geocerca =>
         geocerca.activa && geocerca.usuarioId === userId
     );
 
-    console.log(`🎯 Geocercas activas para este usuario: ${userGeofences.length}`);
+    console.log(`Geocercas activas para este usuario: ${userGeofences.length}`);
 
     userGeofences.forEach(geocerca => {
         const isInside = checkIfLocationInsideGeofence(latitud, longitud, geocerca);
         const previousState = geocerca.lastState || 'unknown';
 
-        console.log(`📍 "${geocerca.nombre}": ${isInside ? 'DENTRO' : 'FUERA'} (anterior: ${previousState}) - Config: ${geocerca.alertaCuando}`);
+        console.log(`"${geocerca.nombre}": ${isInside ? 'DENTRO' : 'FUERA'} (anterior: ${previousState}) - Config: ${geocerca.alertaCuando}`);
 
         let shouldAlert = false;
         let eventType = '';
@@ -403,7 +408,7 @@ function checkGeofencesForLocation(locationData) {
         }
 
         if (shouldAlert) {
-            console.log(`🚨 GENERANDO ALERTA: ${eventType} para "${geocerca.nombre}"`);
+            console.log(`GENERANDO ALERTA: ${eventType} para "${geocerca.nombre}"`);
             handleGeofenceStateChange(geocerca, eventType, locationData);
         }
 
@@ -490,18 +495,16 @@ function createGeofenceAlert(geocerca, eventType, locationData) {
 
      db.collection('alertas_geocercas').add(alertData)
             .then((docRef) => {
-                console.log(`✅ Alerta guardada: ${tipoAlerta} con ID: ${docRef.id}`);
+                console.log(`Alerta guardada: ${tipoAlerta} con ID: ${docRef.id}`);
 
-                // Mostrar notificación con el ID real
                 showGeofenceAlertNotification(geocerca, eventType, locationData, docRef.id);
 
-                // SOLUCIÓN: Forzar recarga de alertas
                 setTimeout(() => {
                     loadAlerts();
                 }, 1000);
             })
             .catch((error) => {
-                console.error('❌ Error guardando alerta:', error);
+                console.error('Error guardando alerta:', error);
             });
 }
 
@@ -509,22 +512,22 @@ function showGeofenceAlertNotification(geocerca, eventType, locationData) {
     let icon, color, titulo, mensaje;
 
     if (eventType === 'entrada_dentro') {
-        icon = '🚨 ENTRADA';
+        icon = 'ENTRADA';
         color = '#ff6b6b';
         titulo = 'ENTRADA EN ZONA CONTROLADA';
         mensaje = 'entró en una zona controlada';
     } else if (eventType === 'salida_dentro') {
-        icon = '🚪 SALIDA';
+        icon = 'SALIDA';
         color = '#ffa726';
         titulo = 'SALIDA DE ZONA CONTROLADA';
         mensaje = 'salió de una zona controlada';
     } else if (eventType === 'salida_fuera') {
-        icon = '⚠️ FUERA';
+        icon = '⚠ FUERA';
         color = '#f44336';
         titulo = 'SALIDA DE ZONA PERMITIDA';
         mensaje = 'salió de la zona permitida';
     } else if (eventType === 'entrada_fuera') {
-        icon = '✅ REGRESO';
+        icon = 'REGRESO';
         color = '#4caf50';
         titulo = 'REGRESO A ZONA PERMITIDA';
         mensaje = 'regresó a la zona permitida';
@@ -691,20 +694,20 @@ function addCircularPoint(lngLat) {
             draggable: false
         })
             .setLngLat(lngLat)
-            .setPopup(new mapboxgl.Popup().setHTML('📍 <strong>Centro de la geocerca</strong><br>Mantén CTRL y haz click para el radio'))
+            .setPopup(new mapboxgl.Popup().setHTML('<strong>Centro de la geocerca</strong><br>Mantén CTRL y haz click para el radio'))
             .addTo(map);
 
-        showTemporaryAlert('✅ CENTRO establecido. Mantén CTRL y haz click para el RADIO');
+        showTemporaryAlert('CENTRO establecido. Mantén CTRL y haz click para el RADIO');
 
     } else if (geofencePoints.length === 1) {
         // Segundo click: radio
         const center = geofencePoints[0];
         const radius = calculateDistance(center.lat, center.lng, lngLat.lat, lngLat.lng);
 
-        console.log('📏 Radio calculado:', radius, 'metros');
+        console.log('Radio calculado:', radius, 'metros');
 
         if (radius < 10) {
-            alert('❌ El radio debe ser de al menos 10 metros');
+            alert('El radio debe ser de al menos 10 metros');
             return;
         }
 
@@ -714,45 +717,125 @@ function addCircularPoint(lngLat) {
 }
 
 function showGeofenceConfirmationDialog(center, radius) {
-    console.log('📝 Mostrando diálogo de confirmación para círculo');
+    console.log('📝 Mostrando modal de confirmación para círculo');
 
-    const nombre = prompt('📝 Nombre de la geocerca:');
-    if (!nombre) {
-        cancelGeofenceCreation();
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Crear Geocerca Circular</h3>
+                <p>Configura los detalles de la geocerca circular</p>
+            </div>
+
+            <div class="modal-input-group">
+                <label for="circularGeofenceName">Nombre de la geocerca</label>
+                <input type="text" id="circularGeofenceName" placeholder="Ej: Zona de Trabajo" >
+                <div class="modal-help-text">Asigna un nombre descriptivo para identificar esta geocerca</div>
+            </div>
+
+            <div class="modal-input-group">
+                <label for="circularGeofenceDescription">Descripción (opcional)</label>
+                <textarea id="circularGeofenceDescription" placeholder="Ej: Área de trabajo principal del equipo"></textarea>
+            </div>
+
+            <div class="config-selector">
+                <div class="config-option" onclick="selectConfigOption(this, 'fuera')">
+                    <div class="config-icon fuera">1</div>
+                    <div class="config-text">
+                        <div class="config-title">Alertar cuando esté FUERA</div>
+                        <div class="config-description">Recibir alertas cuando el usuario salga de esta zona</div>
+                    </div>
+                </div>
+                <div class="config-option" onclick="selectConfigOption(this, 'dentro')">
+                    <div class="config-icon dentro">2</div>
+                    <div class="config-text">
+                        <div class="config-title">Alertar cuando esté DENTRO</div>
+                        <div class="config-description">Recibir alertas cuando el usuario entre en esta zona</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="geofence-info">
+                <div class="geofence-info-item">
+                    <span class="geofence-info-label">Radio:</span>
+                    <span class="geofence-info-value">${radius.toFixed(2)} metros</span>
+                </div>
+                <div class="geofence-info-item">
+                    <span class="geofence-info-label">Centro:</span>
+                    <span class="geofence-info-value">${center.lat.toFixed(6)}, ${center.lng.toFixed(6)}</span>
+                </div>
+            </div>
+
+            <div class="modal-buttons">
+                <button class="modal-btn secondary" onclick="closeModal(this)">
+                    <span>✕</span> Cancelar
+                </button>
+                <button class="modal-btn primary" onclick="confirmCircularGeofence(${center.lat}, ${center.lng}, ${radius})">
+                    <span>✓</span> Crear Geocerca
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+    // Seleccionar la primera opción por defecto
+    selectConfigOption(modal.querySelector('.config-option'), 'fuera');
+}
+
+function selectConfigOption(element, value) {
+    // Encontrar el contenedor padre del modal
+    const modal = element.closest('.modal-content');
+    if (!modal) return;
+
+    // Remover selección anterior en este modal específico
+    const configOptions = modal.querySelectorAll('.config-option');
+    configOptions.forEach(opt => {
+        opt.classList.remove('selected');
+    });
+
+    // Seleccionar nueva opción
+    element.classList.add('selected');
+
+    // Guardar el valor seleccionado en el elemento padre más cercano
+    const configSelector = modal.querySelector('.config-selector');
+    if (configSelector) {
+        configSelector.setAttribute('data-selected', value);
+    }
+
+    // Asegurarse de que el valor se guarde también en una variable accesible
+    element.closest('.modal-overlay').setAttribute('data-selected-config', value);
+}
+
+function confirmCircularGeofence(lat, lng, radius) {
+    const modal = document.querySelector('.modal-overlay');
+    if (!modal) {
+        console.error('No se encontró el modal');
         return;
     }
 
-    const descripcion = prompt('📝 Descripción (opcional):', 'Geocerca de control');
+    const nombre = modal.querySelector('#circularGeofenceName').value;
+    const descripcion = modal.querySelector('#circularGeofenceDescription').value;
 
-    // Seleccionar tipo de alerta
-    let alertaCuando;
-    while (!alertaCuando) {
-        const tipoAlerta = prompt(
-            '🔔 CONFIGURACIÓN DE ALERTA:\n\n' +
-            '1 = Alertar cuando el usuario esté FUERA de la zona\n' +
-            '2 = Alertar cuando el usuario esté DENTRO de la zona\n\n' +
-            'Ingrese 1 o 2:',
-            '1'
-        );
+    // Obtener la configuración seleccionada correctamente
+    const configSelector = modal.querySelector('.config-selector');
+    const alertaCuando = configSelector ? configSelector.getAttribute('data-selected') : 'fuera';
 
-        if (tipoAlerta === '1') {
-            alertaCuando = 'fuera';
-        } else if (tipoAlerta === '2') {
-            alertaCuando = 'dentro';
-        } else if (tipoAlerta === null) {
-            cancelGeofenceCreation();
-            return;
-        } else {
-            alert('❌ Por favor ingrese 1 o 2');
-        }
+    console.log('Datos del formulario:', { nombre, descripcion, alertaCuando });
+
+    if (!nombre) {
+        showTemporaryAlert('El nombre es obligatorio');
+        return;
     }
+
+    closeAllModals();
 
     // Crear la geocerca en Firestore
     crearGeocerca({
         nombre: nombre,
         descripcion: descripcion || '',
         tipo: 'circular',
-        centro: { lat: center.lat, lng: center.lng },
+        centro: { lat: lat, lng: lng },
         radio: radius,
         usuarioId: usuarioSeleccionado.id,
         administradorId: auth.currentUser.uid,
@@ -816,7 +899,7 @@ function addPolygonalPoint(lngLat) {
 
     // Agregar punto al polígono
     polygonPoints.push(lngLat);
-    console.log('✅ Punto añadido al polígono. Total:', polygonPoints.length);
+    console.log('Punto añadido al polígono. Total:', polygonPoints.length);
 
     // Crear marcador para el punto - color celeste
     const marker = new mapboxgl.Marker({
@@ -824,7 +907,7 @@ function addPolygonalPoint(lngLat) {
         draggable: false
     })
         .setLngLat(lngLat)
-        .setPopup(new mapboxgl.Popup().setHTML(`📍 <strong>Punto ${polygonPoints.length}</strong><br>Coordenadas: ${lngLat.lat.toFixed(6)}, ${lngLat.lng.toFixed(6)}`))
+        .setPopup(new mapboxgl.Popup().setHTML(`<strong>Punto ${polygonPoints.length}</strong><br>Coordenadas: ${lngLat.lat.toFixed(6)}, ${lngLat.lng.toFixed(6)}`))
         .addTo(map);
 
     polygonMarkers.push(marker);
@@ -834,11 +917,11 @@ function addPolygonalPoint(lngLat) {
 
     // Mostrar instrucciones según cantidad de puntos
     if (polygonPoints.length === 1) {
-        showTemporaryAlert('✅ Primer punto establecido. Sigue añadiendo puntos con CTRL + Click');
+        showTemporaryAlert('Primer punto establecido. Sigue añadiendo puntos con CTRL + Click');
     } else if (polygonPoints.length === 2) {
-        showTemporaryAlert('✅ Segundo punto añadido. Necesitas al menos 3 puntos');
+        showTemporaryAlert('Segundo punto añadido. Necesitas al menos 3 puntos');
     } else if (polygonPoints.length >= 3) {
-        showTemporaryAlert(`✅ ${polygonPoints.length} puntos añadidos. Continúa o haz doble click para completar`);
+        showTemporaryAlert(`${polygonPoints.length} puntos añadidos. Continúa o haz doble click para completar`);
 
         // Permitir completar el polígono con doble click
         setupPolygonDoubleClick();
@@ -849,14 +932,14 @@ function setupPolygonDoubleClick() {
     // Configurar doble click para completar polígono
     map.once('dblclick', (e) => {
         if (isCreatingGeofence && currentGeofenceType === 'poligonal' && polygonPoints.length >= 3) {
-            console.log('🎯 Doble click detectado - completando polígono');
+            console.log('Doble click detectado - completando polígono');
             completePolygon();
         }
     });
 }
 
 function updatePolygonLine() {
-    console.log('📐 Actualizando línea del polígono. Puntos:', polygonPoints.length);
+    console.log('Actualizando línea del polígono. Puntos:', polygonPoints.length);
 
     // Remover línea anterior si existe
     if (polygonLine && map.getSource('polygon-line')) {
@@ -865,13 +948,13 @@ function updatePolygonLine() {
     }
 
     if (polygonPoints.length < 2) {
-        console.log('❌ No hay suficientes puntos para la línea');
+        console.log('No hay suficientes puntos para la línea');
         return;
     }
 
     // Crear línea conectando los puntos
     const lineCoordinates = polygonPoints.map(point => [point.lng, point.lat]);
-    console.log('📏 Coordenadas de la línea:', lineCoordinates.length);
+    console.log('Coordenadas de la línea:', lineCoordinates.length);
 
     map.addSource('polygon-line', {
         type: 'geojson',
@@ -903,7 +986,7 @@ function completePolygon() {
     console.log('🎯 Completando polígono. Puntos totales:', polygonPoints.length);
 
     if (polygonPoints.length < 3) {
-        alert('❌ Se necesitan al menos 3 puntos para crear un polígono.');
+        alert('Se necesitan al menos 3 puntos para crear un polígono.');
         return;
     }
 
@@ -961,44 +1044,87 @@ function createPolygonGeofence() {
 }
 
 function showPolygonConfirmationDialog(points) {
-    console.log('📝 Mostrando diálogo de confirmación para polígono');
+    console.log('📝 Mostrando modal de confirmación para polígono');
 
     const area = calculatePolygonArea(points);
-    const nombre = prompt('📝 Nombre de la geocerca poligonal:');
-    if (!nombre) {
-        cancelGeofenceCreation();
+
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Crear Geocerca Poligonal</h3>
+                <p style="color: #666; font-size: 12px; margin-top: 5px;">
+                    Puntos: ${points.length} | Área: ${area.toFixed(2)} m²
+                </p>
+            </div>
+            <div class="modal-input-group">
+                <label for="polygonGeofenceName">Nombre de la geocerca:</label>
+                <input type="text" id="polygonGeofenceName" placeholder="Ej: Área de Seguridad" >
+            </div>
+            <div class="modal-input-group">
+                <label for="polygonGeofenceDescription">Descripción (opcional):</label>
+                <textarea id="polygonGeofenceDescription" placeholder="Ej: Zona de seguridad perimetral"></textarea>
+            </div>
+
+            <div class="config-selector">
+                <div class="config-option" onclick="selectConfigOption(this, 'fuera')">
+                    <div class="config-icon fuera">1</div>
+                    <div class="config-text">
+                        <div class="config-title">Alertar cuando esté FUERA</div>
+                        <div class="config-description">Recibir alertas cuando el usuario salga de esta zona</div>
+                    </div>
+                </div>
+                <div class="config-option" onclick="selectConfigOption(this, 'dentro')">
+                    <div class="config-icon dentro">2</div>
+                    <div class="config-text">
+                        <div class="config-title">Alertar cuando esté DENTRO</div>
+                        <div class="config-description">Recibir alertas cuando el usuario entre en esta zona</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-buttons">
+                <button class="modal-btn secondary" onclick="closeModal(this)">Cancelar</button>
+                <button class="modal-btn primary" onclick="confirmPolygonalGeofence(${JSON.stringify(points).replace(/"/g, '&quot;')})">Crear Geocerca</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+    // Seleccionar la primera opción por defecto
+    selectConfigOption(modal.querySelector('.config-option'), 'fuera');
+}
+
+function confirmPolygonalGeofence(points) {
+    const modal = document.querySelector('.modal-overlay');
+    if (!modal) {
+        console.error('No se encontró el modal');
         return;
     }
 
-    const descripcion = prompt('📝 Descripción (opcional):', `Geocerca poligonal de ${points.length} puntos - Área: ${area.toFixed(2)} m²`);
+    const nombre = modal.querySelector('#polygonGeofenceName').value;
+    const descripcion = modal.querySelector('#polygonGeofenceDescription').value;
 
-    // Seleccionar tipo de alerta
-    let alertaCuando;
-    while (!alertaCuando) {
-        const tipoAlerta = prompt(
-            '🔔 CONFIGURACIÓN DE ALERTA:\n\n' +
-            '1 = Alertar cuando el usuario esté FUERA de la zona\n' +
-            '2 = Alertar cuando el usuario esté DENTRO de la zona\n\n' +
-            'Ingrese 1 o 2:',
-            '1'
-        );
+    // Obtener la configuración seleccionada correctamente
+    const configSelector = modal.querySelector('.config-selector');
+    const alertaCuando = configSelector ? configSelector.getAttribute('data-selected') : 'fuera';
 
-        if (tipoAlerta === '1') {
-            alertaCuando = 'fuera';
-        } else if (tipoAlerta === '2') {
-            alertaCuando = 'dentro';
-        } else if (tipoAlerta === null) {
-            cancelGeofenceCreation();
-            return;
-        } else {
-            alert('❌ Por favor ingrese 1 o 2');
-        }
+    console.log('📝 Datos del formulario poligonal:', { nombre, descripcion, alertaCuando });
+
+    if (!nombre) {
+        showTemporaryAlert('El nombre es obligatorio');
+        return;
     }
+
+    closeAllModals();
+
+    const area = calculatePolygonArea(points);
 
     // Crear la geocerca en Firestore
     crearGeocercaPoligonal({
         nombre: nombre,
-        descripcion: descripcion || '',
+        descripcion: descripcion || `Geocerca poligonal de ${points.length} puntos - Área: ${area.toFixed(2)} m²`,
         tipo: 'poligonal',
         puntos: points.map(p => ({ lat: p.lat, lng: p.lng })),
         usuarioId: usuarioSeleccionado.id,
@@ -1010,7 +1136,7 @@ function showPolygonConfirmationDialog(points) {
 }
 
 function crearGeocercaPoligonal(geocercaData) {
-    console.log('💾 Guardando geocerca poligonal en Firebase:', geocercaData);
+    console.log('Guardando geocerca poligonal en Firebase:', geocercaData);
 
     db.collection('geocercas').add({
         ...geocercaData,
@@ -1018,20 +1144,20 @@ function crearGeocercaPoligonal(geocercaData) {
         fechaActualizacion: firebase.firestore.FieldValue.serverTimestamp()
     })
         .then((docRef) => {
-            console.log('✅ Geocerca poligonal creada con ID:', docRef.id);
-            alert(`✅ Geocerca poligonal creada exitosamente\n\nConfiguración: Alertar cuando el usuario esté ${geocercaData.alertaCuando.toUpperCase()} de la zona`);
+            console.log('Geocerca poligonal creada con ID:', docRef.id);
+            alert(`Geocerca poligonal creada exitosamente\n\nConfiguración: Alertar cuando el usuario esté ${geocercaData.alertaCuando.toUpperCase()} de la zona`);
             resetGeofenceCreation();
             loadGeofences();
         })
         .catch((error) => {
-            console.error('❌ Error creando geocerca poligonal:', error);
-            alert('❌ Error al crear geocerca: ' + error.message);
+            console.error('Error creando geocerca poligonal:', error);
+            alert('Error al crear geocerca: ' + error.message);
             resetGeofenceCreation();
         });
 }
 
 function crearGeocerca(geocercaData) {
-    console.log('💾 Guardando geocerca circular en Firebase:', geocercaData);
+    console.log('Guardando geocerca circular en Firebase:', geocercaData);
 
     db.collection('geocercas').add({
         ...geocercaData,
@@ -1039,14 +1165,14 @@ function crearGeocerca(geocercaData) {
         fechaActualizacion: firebase.firestore.FieldValue.serverTimestamp()
     })
         .then((docRef) => {
-            console.log('✅ Geocerca circular creada con ID:', docRef.id);
-            alert(`✅ Geocerca creada exitosamente\n\nConfiguración: Alertar cuando el usuario esté ${geocercaData.alertaCuando.toUpperCase()} de la zona`);
+            console.log('Geocerca circular creada con ID:', docRef.id);
+            alert(`Geocerca creada exitosamente\n\nConfiguración: Alertar cuando el usuario esté ${geocercaData.alertaCuando.toUpperCase()} de la zona`);
             resetGeofenceCreation();
             loadGeofences();
         })
         .catch((error) => {
-            console.error('❌ Error creando geocerca:', error);
-            alert('❌ Error al crear geocerca: ' + error.message);
+            console.error('Error creando geocerca:', error);
+            alert('Error al crear geocerca: ' + error.message);
             resetGeofenceCreation();
         });
 }
@@ -1082,9 +1208,9 @@ function showTemporaryAlert(message) {
 }
 
 function cancelGeofenceCreation() {
-    console.log('❌ Cancelando creación de geocerca');
+    console.log('Cancelando creación de geocerca');
     resetGeofenceCreation();
-    showTemporaryAlert('❌ Creación de geocerca cancelada');
+    showTemporaryAlert('Creación de geocerca cancelada');
 }
 
 function updateGeofenceCreationUI(creating) {
@@ -1092,20 +1218,20 @@ function updateGeofenceCreationUI(creating) {
     if (!createBtn) return;
 
     if (creating) {
-        createBtn.style.backgroundColor = '#ffa726';
-        createBtn.textContent = '⏹️ Cancelar Creación';
+        createBtn.style.backgroundColor = '#728370';
+        createBtn.textContent = 'Cancelar Creación';
         createBtn.onclick = cancelGeofenceCreation;
         createBtn.classList.add('creating-mode');
     } else {
-        createBtn.style.backgroundColor = '#ff6b6b';
-        createBtn.textContent = '🗺️ Crear Geocerca';
+        createBtn.style.backgroundColor = '#728370';
+        createBtn.textContent = 'Crear Geocerca';
         createBtn.onclick = startGeofenceCreation;
         createBtn.classList.remove('creating-mode');
     }
 }
 
 function resetGeofenceCreation() {
-    console.log('🔄 Reseteando creación de geocerca');
+    console.log('Reseteando creación de geocerca');
 
     isCreatingGeofence = false;
     currentGeofenceType = null;
@@ -1156,7 +1282,7 @@ function resetGeofenceCreation() {
     // Resetear interfaz
     updateGeofenceCreationUI(false);
 
-    console.log('✅ Creación de geocerca completamente reseteada');
+    console.log('Creación de geocerca completamente reseteada');
 }
 
 // ========== CÁLCULOS ==========
@@ -1227,7 +1353,7 @@ function loadGeofences() {
         geofencesListener();
     }
 
-    console.log('📥 Cargando geocercas desde Firestore...');
+    console.log('Cargando geocercas desde Firestore...');
 
     geofencesListener = db.collection('geocercas')
         .where('administradorId', '==', auth.currentUser.uid)
@@ -1239,23 +1365,23 @@ function loadGeofences() {
                     id: doc.id,
                     ...data
                 });
-                console.log(`✅ Geocerca cargada: ${data.nombre} (${data.tipo}) - Alerta cuando: ${data.alertaCuando}`);
+                console.log(`Geocerca cargada: ${data.nombre} (${data.tipo}) - Alerta cuando: ${data.alertaCuando}`);
             });
-            console.log(`📊 ${geocercas.length} geocercas cargadas correctamente`);
+            console.log(`${geocercas.length} geocercas cargadas correctamente`);
             renderGeofencesOnMap();
             updateGeofencesPanel();
 
             // INICIAR MONITOREO SI HAY GEOCERCAS
             if (geocercas.length > 0) {
-                console.log('🎯 Geocercas listas para monitoreo');
+                console.log('Geocercas listas para monitoreo');
             }
         }, (error) => {
-            console.error('❌ Error cargando geocercas:', error);
+            console.error('Error cargando geocercas:', error);
         });
 }
 
 function renderGeofencesOnMap() {
-    console.log('🗺️ Renderizando geocercas en el mapa:', geocercas.length);
+    console.log('Renderizando geocercas en el mapa:', geocercas.length);
 
     // Limpiar geocercas anteriores del mapa
     clearGeofencesFromMap();
@@ -1513,51 +1639,152 @@ function editGeofenceConfig(geocercaId) {
     const geocerca = geocercas.find(g => g.id === geocercaId);
     if (!geocerca) return;
 
-    let nuevaConfig;
-    while (!nuevaConfig) {
-        const tipoAlerta = prompt(
-            `🔔 CAMBIAR CONFIGURACIÓN PARA: ${geocerca.nombre}\n\n` +
-            '1 = Alertar cuando el usuario esté FUERA de la zona\n' +
-            '2 = Alertar cuando el usuario esté DENTRO de la zona\n\n' +
-            'Configuración actual: ' + (geocerca.alertaCuando === 'dentro' ? 'DENTRO' : 'FUERA') + '\n\n' +
-            'Ingrese 1 o 2:',
-            geocerca.alertaCuando === 'dentro' ? '2' : '1'
-        );
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>⚙️ Configurar Geocerca</h3>
+                <p>Cambiar el comportamiento de alertas para "${geocerca.nombre}"</p>
+            </div>
 
-        if (tipoAlerta === '1') {
-            nuevaConfig = 'fuera';
-        } else if (tipoAlerta === '2') {
-            nuevaConfig = 'dentro';
-        } else if (tipoAlerta === null) {
-            return; // Usuario canceló
-        } else {
-            alert('❌ Por favor ingrese 1 o 2');
-        }
+            <div class="config-selector">
+                <div class="config-option ${geocerca.alertaCuando === 'fuera' ? 'selected' : ''}"
+                     onclick="selectConfigOption(this, 'fuera')">
+                    <div class="config-icon fuera">1</div>
+                    <div class="config-text">
+                        <div class="config-title">Alertar cuando esté FUERA</div>
+                        <div class="config-description">Recibir alertas cuando el usuario salga de esta zona</div>
+                    </div>
+                </div>
+                <div class="config-option ${geocerca.alertaCuando === 'dentro' ? 'selected' : ''}"
+                     onclick="selectConfigOption(this, 'dentro')">
+                    <div class="config-icon dentro">2</div>
+                    <div class="config-text">
+                        <div class="config-title">Alertar cuando esté DENTRO</div>
+                        <div class="config-description">Recibir alertas cuando el usuario entre en esta zona</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="geofence-info">
+                <div class="geofence-info-item">
+                    <span class="geofence-info-label">Geocerca:</span>
+                    <span class="geofence-info-value">${geocerca.nombre}</span>
+                </div>
+                <div class="geofence-info-item">
+                    <span class="geofence-info-label">Tipo:</span>
+                    <span class="geofence-info-value">${geocerca.tipo}</span>
+                </div>
+                <div class="geofence-info-item">
+                    <span class="geofence-info-label">Configuración actual:</span>
+                    <span class="geofence-info-value">${geocerca.alertaCuando.toUpperCase()}</span>
+                </div>
+            </div>
+
+            <div class="modal-buttons">
+                <button class="modal-btn secondary" onclick="closeModal(this)">
+                    <span>✕</span> Cancelar
+                </button>
+                <button class="modal-btn primary" onclick="saveGeofenceConfig('${geocercaId}')">
+                    <span>✓</span> Guardar Cambios
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+    modal.setAttribute('data-selected', geocerca.alertaCuando);
+}
+
+function saveGeofenceConfig(geocercaId) {
+    const modal = document.querySelector('.modal-overlay');
+    if (!modal) {
+        console.error('No se encontró el modal');
+        return;
     }
+
+    // Obtener la configuración seleccionada del modal
+    const configSelector = modal.querySelector('.config-selector');
+    const nuevaConfig = configSelector ? configSelector.getAttribute('data-selected') : 'fuera';
+
+    if (!nuevaConfig) {
+        showTemporaryAlert('Por favor selecciona una configuración');
+        return;
+    }
+
+    closeAllModals();
 
     db.collection('geocercas').doc(geocercaId).update({
         alertaCuando: nuevaConfig,
         fechaActualizacion: firebase.firestore.FieldValue.serverTimestamp()
     })
-        .then(() => {
-            alert(`✅ Configuración actualizada:\n\nAhora se alertará cuando el usuario esté ${nuevaConfig.toUpperCase()} de la zona`);
-        })
-        .catch((error) => {
-            alert('❌ Error actualizando configuración: ' + error.message);
-        });
+    .then(() => {
+        showTemporaryAlert(`Configuración actualizada:\n\nAhora se alertará cuando el usuario esté ${nuevaConfig.toUpperCase()} de la zona`);
+        loadGeofences(); // Recargar las geocercas para reflejar el cambio
+    })
+    .catch((error) => {
+        showTemporaryAlert('Error actualizando configuración: ' + error.message);
+    });
 }
 
-function deleteGeofence(geocercaId) {
-    if (confirm('¿Estás seguro de que quieres eliminar esta geocerca?')) {
-        db.collection('geocercas').doc(geocercaId).delete()
-            .then(() => {
-                alert('Geocerca eliminada');
-            })
-            .catch((error) => {
-                alert('Error eliminando geocerca: ' + error.message);
-            });
+// Función para cerrar modales
+function closeModal(element) {
+    const modal = element.closest('.modal-overlay');
+    if (modal) {
+        modal.remove();
     }
 }
+
+// Función para cerrar todos los modales
+function closeAllModals() {
+    document.querySelectorAll('.modal-overlay').forEach(modal => {
+        modal.remove();
+    });
+}
+
+// Cerrar modal al hacer click fuera del contenido
+document.addEventListener('click', function(e) {
+    if (e.target.classList.contains('modal-overlay')) {
+        e.target.remove();
+    }
+});
+
+// Cerrar modal con tecla ESC
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closeAllModals();
+    }
+});
+
+function deleteGeofence(geocercaId) {
+    const geocerca = geocercas.find(g => g.id === geocercaId);
+    if (!geocerca) return;
+
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+        <div class="modal-content confirmation-modal">
+            <div class="confirmation-icon"></div>
+            <div class="confirmation-message">¿Eliminar geocerca?</div>
+            <div class="confirmation-details">
+                Estás a punto de eliminar la geocerca <strong>"${geocerca.nombre}"</strong>.
+                Esta acción no se puede deshacer y se perderán todas las alertas asociadas.
+            </div>
+            <div class="modal-buttons">
+                <button class="modal-btn secondary" onclick="closeModal(this)">
+                    <span>✕</span> Conservar
+                </button>
+                <button class="modal-btn danger" onclick="confirmDeleteGeofence('${geocercaId}')">
+                    <span></span> Eliminar
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+}
+
 
 function toggleGeofence(geocercaId, activa) {
     db.collection('geocercas').doc(geocercaId).update({
@@ -1592,7 +1819,7 @@ function loadAlerts() {
         alertsListener();
     }
 
-    console.log('📥 Cargando alertas desde Firestore...');
+    console.log('Cargando alertas desde Firestore...');
 
     // SOLUCIÓN: Manejar el error del índice
     const query = db.collection('alertas_geocercas')
@@ -1609,18 +1836,18 @@ function loadAlerts() {
                 ...data
             });
         });
-        console.log('⚠️ Alertas cargadas:', alertas.length);
+        console.log('⚠ Alertas cargadas:', alertas.length);
         updateAlertsPanel();
 
         // Actualizar badge
         updateAlertsBadge();
 
     }, (error) => {
-        console.error('❌ Error cargando alertas:', error);
+        console.error('Error cargando alertas:', error);
 
         // SOLUCIÓN: Cargar sin ordenar si falla el índice
         if (error.code === 'failed-precondition') {
-            console.log('🔄 Cargando alertas sin ordenar...');
+            console.log('Cargando alertas sin ordenar...');
             loadAlertsWithoutOrder();
         }
     });
@@ -1648,12 +1875,12 @@ function loadAlertsWithoutOrder() {
                 return timeB - timeA; // Orden descendente
             });
 
-            console.log('⚠️ Alertas cargadas (sin índice):', alertas.length);
+            console.log('Alertas cargadas (sin índice):', alertas.length);
             updateAlertsPanel();
             updateAlertsBadge();
         })
         .catch((error) => {
-            console.error('❌ Error cargando alertas sin orden:', error);
+            console.error('Error cargando alertas sin orden:', error);
         });
 }
 
@@ -1712,14 +1939,14 @@ function createAlertElement(alerta) {
 
     // Determinar estilo según el tipo de alerta
     let alertClass = 'alert-item ';
-    let icon = '📢';
+    let icon = '';
 
     if (alerta.tipo?.includes('controlada')) {
         alertClass += 'critical';
-        icon = '🚨';
+        icon = '●';
     } else if (alerta.tipo?.includes('permitida')) {
         alertClass += 'warning';
-        icon = '⚠️';
+        icon = '⚠';
     } else {
         alertClass += 'info';
     }
@@ -1771,14 +1998,14 @@ function closeGeofenceNotification(alertId) {
 }
 
 function markAlertAsRead(alertId) {
-    console.log('📝 Marcando alerta como leída:', alertId);
+    console.log('Marcando alerta como leída:', alertId);
 
     db.collection('alertas_geocercas').doc(alertId).update({
         leida: true,
         fechaLectura: firebase.firestore.FieldValue.serverTimestamp()
     })
     .then(() => {
-        console.log('✅ Alerta marcada como leída');
+        console.log('Alerta marcada como leída');
 
         // Actualizar localmente
         const alertaIndex = alertas.findIndex(a => a.id === alertId);
@@ -1797,13 +2024,25 @@ function markAlertAsRead(alertId) {
         }, 500);
 
         // Mostrar confirmación
-        showTemporaryAlert('✅ Alerta marcada como leída');
+        showTemporaryAlert('Alerta marcada como leída');
 
     })
     .catch((error) => {
-        console.error('❌ Error marcando alerta como leída:', error);
-        showTemporaryAlert('❌ Error al marcar como leída: ' + error.message);
+        console.error('Error marcando alerta como leída:', error);
+        showTemporaryAlert('Error al marcar como leída: ' + error.message);
     });
+}
+
+function confirmDeleteGeofence(geocercaId) {
+    if (confirm('¿Estás seguro de que quieres eliminar esta geocerca?')) {
+        db.collection('geocercas').doc(geocercaId).delete()
+            .then(() => {
+                alert('Geocerca eliminada');
+            })
+            .catch((error) => {
+                alert('Error eliminando geocerca: ' + error.message);
+            });
+    }
 }
 
 // ========== AUTENTICACIÓN ==========
@@ -1833,11 +2072,10 @@ function setupAuthListener() {
                     document.getElementById('createGeofenceBtn').style.display = 'none';
                 }
 
-                // ✅ INICIAR MONITOREO DESPUÉS DE TODO ESTÉ CARGADO
                 setTimeout(() => {
                     if (map) map.resize();
-                    setupCurrentLocationListener(); // ✅ ESTA ES LA FUNCIÓN CLAVE
-                    console.log('✅ Sistema de monitoreo iniciado correctamente');
+                    setupCurrentLocationListener();
+                    console.log('Sistema de monitoreo iniciado correctamente');
                 }, 1500);
 
             } catch (error) {
@@ -2117,7 +2355,7 @@ function stopRealtimeUpdates() {
     hideRealTimeIndicator();
     removeCurrentLocationMarker();
     hideLocationsPanel();
-    console.log('🛑 Monitoreo detenido correctamente');
+    console.log('Monitoreo detenido correctamente');
 }
 
 // ========== GESTIÓN DE USUARIOS ==========
@@ -2236,7 +2474,7 @@ function selectUser(userId) {
     const usuario = usuariosDisponibles.find(u => u.id === userId);
     if (usuario) {
         usuarioSeleccionado = usuario;
-        alert(`✅ Ahora visualizas las ubicaciones de: ${usuario.nombre}`);
+        alert(`Ahora visualizas las ubicaciones de: ${usuario.nombre}`);
 
         document.querySelector('div[style*="position: fixed"]')?.remove();
 
@@ -2249,7 +2487,7 @@ function selectUser(userId) {
             panelTitle.innerHTML = `Ubicaciones de ${usuario.nombre} <span class="real-time-indicator" id="realTimeIndicator" style="display: none;">● EN VIVO</span>`;
         }
 
-        console.log(`🎯 Monitoreo configurado para usuario: ${usuario.nombre}`);
+        console.log(`Monitoreo configurado para usuario: ${usuario.nombre}`);
     }
 }
 
@@ -2257,47 +2495,128 @@ function showUserManagement() {
     const user = auth.currentUser;
     if (!user || currentUserRole !== 'admin') return;
 
-    const email = prompt('Email del nuevo usuario:');
-    const nombre = prompt('Nombre del nuevo usuario:');
-    const password = prompt('Contraseña para el nuevo usuario (mínimo 6 caracteres):');
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Crear Nuevo Usuario</h3>
+                <p>Agregar un nuevo usuario al sistema de monitoreo</p>
+            </div>
 
-    if (email && nombre && password) {
-        if (password.length < 6) {
-            alert('La contraseña debe tener al menos 6 caracteres');
-            return;
-        }
+            <div class="modal-input-group">
+                <label for="userEmail">Correo electrónico</label>
+                <input type="email" id="userEmail" placeholder="usuario@empresa.com" required>
+                <div class="modal-help-text">El usuario usará este email para iniciar sesión</div>
+            </div>
 
-        auth.createUserWithEmailAndPassword(email, password)
-            .then((userCredential) => {
-                return db.collection("usuarios").doc(userCredential.user.uid).set({
-                    nombre: nombre,
-                    correo: email,
-                    rol: 'usuario',
-                    administradorId: user.uid,
-                    tipoDispositivo: 'Por asignar',
-                    deviceId: '',
-                    fechaRegistro: firebase.firestore.FieldValue.serverTimestamp()
-                });
-            })
-            .then(() => {
-                alert('✅ Usuario creado exitosamente\n\nEmail: ' + email + '\nContraseña: ' + password + '\n\nEl usuario puede iniciar sesión en la app móvil con estas credenciales.');
-                loadManagedUsers();
-            })
-            .catch((error) => {
-                console.error('Error creando usuario:', error);
-                let errorMessage = 'Error al crear usuario: ';
-                if (error.code === 'auth/email-already-in-use') {
-                    errorMessage += 'El email ya está en uso';
-                } else if (error.code === 'auth/invalid-email') {
-                    errorMessage += 'Email inválido';
-                } else if (error.code === 'auth/weak-password') {
-                    errorMessage += 'Contraseña muy débil';
-                } else {
-                    errorMessage += error.message;
-                }
-                alert(errorMessage);
-            });
+            <div class="modal-input-group">
+                <label for="userName">Nombre completo</label>
+                <input type="text" id="userName" placeholder="Nombre del usuario" required>
+            </div>
+
+            <div class="modal-input-group">
+                <label for="userPassword">Contraseña</label>
+                <input type="password" id="userPassword" placeholder="Mínimo 6 caracteres" required>
+                <div class="modal-help-text">La contraseña debe tener al menos 6 caracteres</div>
+            </div>
+
+            <div class="modal-buttons">
+                <button class="modal-btn secondary" onclick="closeModal(this)">
+                    <span>✕</span> Cancelar
+                </button>
+                <button class="modal-btn primary" onclick="createNewUser()">
+                    <span>✓</span> Crear Usuario
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+}
+
+function createNewUser() {
+    const modal = document.querySelector('.modal-overlay');
+    if (!modal) {
+        console.error('No se encontró el modal');
+        return;
     }
+
+    const email = modal.querySelector('#userEmail').value;
+    const nombre = modal.querySelector('#userName').value;
+    const password = modal.querySelector('#userPassword').value;
+
+    if (!email || !nombre || !password) {
+        showTemporaryAlert('Todos los campos son obligatorios');
+        return;
+    }
+
+    if (password.length < 6) {
+        showTemporaryAlert('La contraseña debe tener al menos 6 caracteres');
+        return;
+    }
+
+    // Validar formato de email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+        showTemporaryAlert('Por favor ingresa un email válido');
+        return;
+    }
+
+    closeAllModals();
+
+    // Mostrar indicador de carga
+    showTemporaryAlert('Creando usuario...');
+
+    auth.createUserWithEmailAndPassword(email, password)
+        .then((userCredential) => {
+            return db.collection("usuarios").doc(userCredential.user.uid).set({
+                nombre: nombre,
+                correo: email,
+                rol: 'usuario',
+                administradorId: auth.currentUser.uid,
+                tipoDispositivo: 'Por asignar',
+                deviceId: '',
+                fechaRegistro: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        })
+        .then(() => {
+            showTemporaryAlert('✅ Usuario creado exitosamente\n\nEl usuario puede iniciar sesión en la app móvil con las credenciales proporcionadas.');
+            loadManagedUsers();
+        })
+        .catch((error) => {
+            console.error('Error creando usuario:', error);
+            let errorMessage = 'Error al crear usuario: ';
+            if (error.code === 'auth/email-already-in-use') {
+                errorMessage += 'El email ya está en uso';
+            } else if (error.code === 'auth/invalid-email') {
+                errorMessage += 'Email inválido';
+            } else if (error.code === 'auth/weak-password') {
+                errorMessage += 'Contraseña muy débil';
+            } else {
+                errorMessage += error.message;
+            }
+            showTemporaryAlert(errorMessage);
+        });
+}
+
+
+// Función auxiliar para obtener valores de formularios de manera segura
+function getFormValue(modal, selector) {
+    const element = modal.querySelector(selector);
+    return element ? element.value : '';
+}
+
+// Función para validar formularios
+function validateForm(modal, requiredFields) {
+    for (const field of requiredFields) {
+        const value = getFormValue(modal, field.selector);
+        if (!value) {
+            showTemporaryAlert(field.errorMessage);
+            return false;
+        }
+    }
+    return true;
 }
 
 // ========== FUNCIÓN DE DEBUG ==========
@@ -2313,9 +2632,6 @@ function testAlertSystem() {
         userId: usuarioSeleccionado.id,
         direccion: 'Ubicación de prueba'
     };
-
-    console.log('🧪 Probando sistema de alertas...');
-    checkGeofencesForLocation(testLocation);
 }
 
 
@@ -2324,97 +2640,6 @@ function testAlertSystem() {
 
 
 //////////////////////PRUEBAS
-// ========== PRUEBAS DEL SISTEMA DE ALERTAS ==========
-function testAlertSystem() {
-    if (!usuarioSeleccionado) {
-        alert('Selecciona un usuario primero');
-        return;
-    }
-
-    // Crear una ubicación de prueba
-    const testLocation = {
-        latitud: -16.500000,
-        longitud: -68.124000,
-        userId: usuarioSeleccionado.id,
-        direccion: 'Ubicación de prueba para alertas',
-        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-        deviceId: 'test-device',
-        precision: 10,
-        velocidad: 0
-    };
-
-    console.log('🧪 INICIANDO PRUEBA DE ALERTAS...');
-    console.log('📍 Ubicación de prueba:', testLocation);
-    console.log('👤 Usuario:', usuarioSeleccionado.nombre);
-    console.log('📊 Geocercas cargadas:', geocercas.length);
-
-    // Verificar contra todas las geocercas
-    checkGeofencesForLocation(testLocation);
-}
-
-// Agrega un botón de prueba en tu HTML o usa la consola
-function addTestButton() {
-    const testBtn = document.createElement('button');
-    testBtn.textContent = '🧪 Probar Alertas';
-    testBtn.style.cssText = `
-        position: fixed;
-        bottom: 100px;
-        right: 20px;
-        z-index: 1000;
-        padding: 10px 15px;
-        background: #ff9800;
-        color: white;
-        border: none;
-        border-radius: 5px;
-        cursor: pointer;
-        font-size: 14px;
-    `;
-    testBtn.onclick = testAlertSystem;
-    document.body.appendChild(testBtn);
-}
-// Simula movimiento entre diferentes puntos
-function simulateMovement() {
-    if (!usuarioSeleccionado) {
-        alert('Selecciona un usuario primero');
-        return;
-    }
-
-    const testPoints = [
-        { lat: -16.5000, lng: -68.1240, name: "Punto 1 - Centro" },
-        { lat: -16.5100, lng: -68.1300, name: "Punto 2 - Sur" },
-        { lat: -16.4900, lng: -68.1180, name: "Punto 3 - Norte" },
-        { lat: -16.5000, lng: -68.1400, name: "Punto 4 - Oeste" }
-    ];
-
-    let currentIndex = 0;
-
-    const moveInterval = setInterval(() => {
-        const point = testPoints[currentIndex];
-
-        const testLocation = {
-            latitud: point.lat,
-            longitud: point.lng,
-            userId: usuarioSeleccionado.id,
-            direccion: `Simulación: ${point.name}`,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-            deviceId: 'simulator',
-            precision: 5,
-            velocidad: 30
-        };
-
-        console.log(`🧭 Movimiento simulado a: ${point.name}`);
-        checkGeofencesForLocation(testLocation);
-
-        currentIndex = (currentIndex + 1) % testPoints.length;
-    }, 5000); // Cambia cada 5 segundos
-
-    // Para detener la simulación
-    setTimeout(() => {
-        clearInterval(moveInterval);
-        console.log('⏹️ Simulación terminada');
-    }, 60000); // Se detiene después de 1 minuto
-}
-// Muestra el estado actual de todas las geocercas
 function showGeofenceStatus() {
     console.log('📊 ESTADO ACTUAL DE GEOCERCAS:');
 
@@ -2435,35 +2660,7 @@ function showGeofenceStatus() {
     });
 }
 
-// Verifica una ubicación específica manualmente
-function testSpecificLocation(lat, lng) {
-    if (!usuarioSeleccionado) {
-        alert('Selecciona un usuario primero');
-        return;
-    }
 
-    const testLocation = {
-        latitud: lat,
-        longitud: lng,
-        userId: usuarioSeleccionado.id,
-        direccion: 'Ubicación manual de prueba',
-        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-        deviceId: 'manual-test',
-        precision: 5,
-        velocidad: 0
-    };
-
-    console.log(`🎯 Probando ubicación específica: ${lat}, ${lng}`);
-    checkGeofencesForLocation(testLocation);
-}
-
-function toggleDebugPanel() {
-    const panel = document.getElementById('debugPanel');
-    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-    if (panel.style.display === 'block') {
-        updateDebugInfo();
-    }
-}
 
 function updateDebugInfo() {
     const debugInfo = document.getElementById('debugInfo');
@@ -2505,6 +2702,68 @@ function consoleTest() {
         geofences: !!geofencesListener,
         alerts: !!alertsListener
     });
+}
+
+// Función para corregir deviceId de usuarios móviles
+async function fixMobileUsersDeviceId() {
+    if (currentUserRole !== 'admin') return;
+
+    try {
+        const usersSnapshot = await db.collection("usuarios")
+            .where("rol", "==", "usuario")
+            .get();
+
+        const batch = db.batch();
+        let fixedCount = 0;
+
+        usersSnapshot.forEach(doc => {
+            const userData = doc.data();
+
+            // Si el usuario tiene deviceId de web pero debería ser móvil
+            if (userData.deviceId && userData.deviceId.startsWith('web-')) {
+                // Marcar para que la app móvil lo actualice
+                batch.update(doc.ref, {
+                    deviceId: 'pending-mobile-update',
+                    necesitaActualizarDeviceId: true,
+                    fechaActualizacion: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                fixedCount++;
+            }
+        });
+
+        if (fixedCount > 0) {
+            await batch.commit();
+            console.log(`✅ ${fixedCount} usuarios marcados para actualización móvil`);
+            alert(`${fixedCount} usuarios listos para actualizar deviceId en móvil`);
+        }
+
+    } catch (error) {
+        console.error('Error corrigiendo usuarios:', error);
+    }
+}
+
+// Agregar botón en la interfaz de admin
+function addFixMobileUsersButton() {
+    if (currentUserRole !== 'admin') return;
+
+    const fixBtn = document.createElement('button');
+    fixBtn.textContent = '🔧 Corregir Usuarios Móviles';
+    fixBtn.title = 'Marcar usuarios para que actualicen deviceId en móvil';
+    fixBtn.style.cssText = `
+        position: fixed;
+        bottom: 200px;
+        right: 20px;
+        z-index: 1000;
+        padding: 10px 15px;
+        background: #2196F3;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 12px;
+    `;
+    fixBtn.onclick = fixMobileUsersDeviceId;
+    document.body.appendChild(fixBtn);
 }
 
 // ========== INICIALIZACIÓN ==========
